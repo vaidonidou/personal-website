@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Image Layers</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        /* Image container with border, scrolling enabled */
+        .image-container {
+            border: 3px solid #333;
+            overflow: auto; /* Enables scrollbars when zoomed */
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Wrapper to keep images together and allow zooming */
+        .image-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            transform-origin: center center;
+        }
+
+        /* Layered images */
+        .layer {
+            position: absolute;
+            transition: transform 0.2s ease-in-out;
+        }
+
+        /* Hide image when unchecked */
+        .hidden {
+            display: none;
+        }
+
+        /* Checkbox container */
+        .checkbox-container {
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: #f8f9fa;
+        }
+
+        /* Zoom buttons inside the image container */
+        .zoom-buttons {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            border-radius: 5px;
+        }
+
+        .zoom-buttons button {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-3">
+            <select id="folder-selector" class="form-control">
+                <option value="folder1" selected>Korinthou Str.</option>
+                <option value="folder2">Ermou Str.</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="container mt-4">
+    <div class="row">
+        <!-- Image Display Section (Centered Column, size 6) -->
+        <div class="col-10">
+            <div class="image-container">
+                <!-- Zoom buttons inside the image container -->
+                <div class="zoom-buttons">
+                    <button id="zoom-in" class="btn btn-primary btn-sm">+</button>
+                    <button id="zoom-out" class="btn btn-primary btn-sm">-</button>
+                </div>
+                <!-- Images will be dynamically loaded here -->
+                <div id="image-wrapper" class="image-wrapper"></div>
+            </div>
+        </div>
+
+        <!-- Sidebar for Checkboxes (Column size 2) -->
+        <div class="col-2">
+            <div class="checkbox-container">
+                <h5>Layers</h5>
+                <div id="checkbox-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const folderSelector = document.getElementById("folder-selector");
+    const imageWrapper = document.getElementById("image-wrapper");
+    const imageContainer = document.querySelector(".image-container");
+    const checkboxList = document.getElementById("checkbox-list");
+    let zoomLevel = 1;
+    let isPanning = false;
+    let startX, startY, scrollLeft, scrollTop;
+
+    // Function to load images dynamically based on selected folder
+    function loadImages(folder) {
+        imageWrapper.innerHTML = "";
+        checkboxList.innerHTML = "";
+
+        // Example image filenames (replace with real images in your folder)
+        const imageFiles = ["facade.png", "layer 1.png", "layer 2.png"];
+
+        let firstImageLoaded = false;
+
+        imageFiles.forEach((imageFile, index) => {
+            const imagePath = `images/${folder}/${imageFile}`;
+
+            // Create image element
+            const img = document.createElement("img");
+            img.src = imagePath;
+            img.classList.add("layer");
+            img.dataset.index = index;
+
+            img.onerror = function () {
+                console.error(`Image not found: ${imagePath}`);
+            };
+
+            // Ensure images scale properly to fit the container
+            img.onload = function () {
+                if (!firstImageLoaded) {
+                    firstImageLoaded = true;
+                    fitImagesToContainer();
+                }
+            };
+
+            // Add image to the container
+            imageWrapper.appendChild(img);
+
+            // Create checkbox
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = true;
+            checkbox.dataset.index = index;
+
+            const label = document.createElement("label");
+            label.textContent = ` ${imageFile.replace(".png", "")}`;
+            label.style.marginLeft = "5px";
+
+            // Hide/show image on checkbox toggle
+            checkbox.addEventListener("change", function () {
+                img.classList.toggle("hidden", !this.checked);
+            });
+
+            // Append checkbox to the list
+            const checkboxDiv = document.createElement("div");
+            checkboxDiv.appendChild(checkbox);
+            checkboxDiv.appendChild(label);
+            checkboxList.appendChild(checkboxDiv);
+        });
+    }
+
+    // Adjust image scaling to fit inside container
+    function fitImagesToContainer() {
+        const images = document.querySelectorAll(".layer");
+        const containerWidth = imageContainer.clientWidth;
+        const containerHeight = imageContainer.clientHeight;
+
+        images.forEach((img) => {
+            const aspectRatio = img.naturalWidth / img.naturalHeight;
+            let newWidth = containerWidth;
+            let newHeight = containerWidth / aspectRatio;
+
+            if (newHeight > containerHeight) {
+                newHeight = containerHeight;
+                newWidth = containerHeight * aspectRatio;
+            }
+
+            img.style.width = `${newWidth}px`;
+            img.style.height = `${newHeight}px`;
+        });
+    }
+
+    // Change event for folder selector (loads new images)
+    folderSelector.addEventListener("change", function () {
+        loadImages(this.value);
+    });
+
+    // Zoom functions
+    document.getElementById("zoom-in").addEventListener("click", function () {
+        zoomLevel += 0.1;
+        applyZoom();
+    });
+
+    document.getElementById("zoom-out").addEventListener("click", function () {
+        if (zoomLevel > 0.5) {
+            zoomLevel -= 0.1;
+            applyZoom();
+        }
+    });
+
+    // Apply zoom to all images
+    function applyZoom() {
+        document.querySelectorAll(".layer").forEach((img) => {
+            img.style.transform = `scale(${zoomLevel})`;
+        });
+
+        // Enable scrollbars when zoomed in
+        if (zoomLevel > 1) {
+            imageContainer.style.overflow = "auto";
+        } else {
+            imageContainer.style.overflow = "hidden";
+        }
+    }
+
+    // Panning (dragging the image inside the frame)
+    imageContainer.addEventListener("mousedown", (event) => {
+        if (zoomLevel <= 1) return; // Allow panning only when zoomed in
+        isPanning = true;
+        startX = event.pageX - imageContainer.offsetLeft;
+        startY = event.pageY - imageContainer.offsetTop;
+        scrollLeft = imageContainer.scrollLeft;
+        scrollTop = imageContainer.scrollTop;
+        imageWrapper.style.cursor = "grabbing";
+    });
+
+    imageContainer.addEventListener("mouseup", () => {
+        isPanning = false;
+        imageWrapper.style.cursor = "grab";
+    });
+
+    imageContainer.addEventListener("mouseleave", () => {
+        isPanning = false;
+        imageWrapper.style.cursor = "grab";
+    });
+
+    imageContainer.addEventListener("mousemove", (event) => {
+        if (!isPanning) return;
+        event.preventDefault();
+        imageContainer.scrollLeft = scrollLeft - (event.pageX - startX);
+        imageContainer.scrollTop = scrollTop - (event.pageY - startY);
+    });
+
+    // Load default folder on page load
+    loadImages("folder1");
+</script>
+
+</body>
+</html>
